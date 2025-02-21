@@ -59,7 +59,7 @@ const fetchProfileData = async () => {
           login
           totalUp
           totalDown
-          labels{
+          labels {
             labelName
           }
       }
@@ -205,10 +205,11 @@ const displayProfile = (data) => {
       </div>
       <div class="flex justify-between items-center">
         <span class="text-blue-200">Cohort:</span>
-        <span class="font-medium">${user.labels[0].labelName.replace(
-          'Cohort ',
-          ''
-        )}</span>
+        <span class="font-medium">${
+          user.labels && user.labels[0].labelName
+            ? user.labels[0].labelName.replace('Cohort ', '')
+            : ''
+        }</span>
       </div>
     `;
 
