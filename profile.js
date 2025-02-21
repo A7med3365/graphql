@@ -264,7 +264,6 @@ const displayProfile = (data) => {
 
   // Initialize chart and projects map
   createXpByProjectGraph(data.projects);
-  renderProjectsMap(data.projects);
 
   // Logout handler
   document.getElementById('logout-button').addEventListener('click', () => {
@@ -596,30 +595,6 @@ const createXpByProjectGraph = (projects) => {
     window.removeEventListener('resize', debouncedResize);
     clearTimeout(resizeTimeout);
   };
-};
-
-const renderProjectsMap = (projects) => {
-  const container = document.getElementById('projects-map');
-  container.innerHTML = projects
-    .map(
-      (project) => `
-      <div class="flex-shrink-0 w-48 p-4 bg-white/10 rounded-lg text-center hover:bg-white/20 transition-all">
-        <h4 class="font-bold text-white mb-2">${project.object.name}</h4>
-        <div class="text-purple-300 text-sm">
-          +${formatNumber(project.amount)}
-        </div>
-        <div class="text-xs text-white/60 mt-2">
-          ${new Date(project.createdAt).toLocaleDateString()}
-        </div>
-        <div class="mt-2">
-          <span class="px-2 py-1 bg-[#c62368] rounded-full text-xs text-white">
-            ${project.object.attrs.language}
-          </span>
-        </div>
-      </div>
-    `
-    )
-    .join('');
 };
 
 document.addEventListener('DOMContentLoaded', () => {
