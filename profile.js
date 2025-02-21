@@ -33,9 +33,22 @@ particlesJS('particles-js', {
 });
 
 const fetchProfileData = async () => {
-  const query = `
-    {
-      user{
+  const getEventIdQuery = `
+    query GetEventId {
+      events: progress(
+        order_by: [{objectId: asc}, {createdAt: desc}]
+        distinct_on: [objectId]
+        where: {object: {name: {_eq: "Module"}}}
+        limit: 1
+      ) {
+        eventId
+      }
+    }
+  `;
+
+  const getProfileQuery = `
+    query GetProfileData($eventId: Int!) {
+      user {
           id
           auditRatio
           campus
@@ -50,7 +63,7 @@ const fetchProfileData = async () => {
             labelName
           }
       }
-      xp: transaction_aggregate(where: {type: {_eq: "xp"}, eventId: {_eq: 20}}) {
+      xp: transaction_aggregate(where: {type: {_eq: "xp"}, eventId: {_eq: $eventId}}) {
         aggregate {
           sum {
             amount
@@ -58,7 +71,7 @@ const fetchProfileData = async () => {
         }
       }
       progress: transaction(
-        where: {type: {_eq: "xp"}, eventId: {_eq: 20}}
+        where: {type: {_eq: "xp"}, eventId: {_eq: $eventId}}
         order_by: {createdAt: asc}
       ) {
         amount
@@ -99,23 +112,45 @@ const fetchProfileData = async () => {
     }
   `;
 
-  const response = await fetch(
-    'https://learn.reboot01.com/api/graphql-engine/v1/graphql',
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query }),
+  const fetchGraphQL = async (query, variables = {}) => {
+    const response = await fetch(
+      'https://learn.reboot01.com/api/graphql-engine/v1/graphql',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
     }
-  );
+    
+    const json = await response.json();
+    if (json.errors) {
+      throw new Error(json.errors[0].message);
+    }
+    
+    return json.data;
+  };
 
-  if (response.ok) {
-    const data = await response.json();
-    displayProfile(data.data);
-  } else {
-    alert('Failed to fetch profile data');
+  try {
+    // Get the module eventId first
+    const eventData = await fetchGraphQL(getEventIdQuery);
+    const eventId = eventData.events?.[0]?.eventId;
+    if (!eventId) {
+      throw new Error('No module event found');
+    }
+
+    // Then fetch profile data with the eventId
+    const profileData = await fetchGraphQL(getProfileQuery, { eventId });
+    displayProfile(profileData);
+  } catch (error) {
+    alert(error.message || 'Failed to fetch profile data');
+    console.error('Profile data fetch error:', error);
   }
 };
 
