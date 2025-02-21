@@ -274,6 +274,13 @@ const displayProfile = (data) => {
 };
 
 const createXpByProjectGraph = (projects) => {
+  // Clear any existing chart first to prevent duplicates
+  const parentElement = document.getElementById('xp-progress').parentElement;
+  parentElement.style.width = '100%'; // Make container responsive
+  parentElement.style.maxWidth = '100%'; // Ensure container doesn't overflow
+  parentElement.style.position = 'relative'; // For proper sizing
+  parentElement.style.display = 'block'; // Ensure block display
+
   // Sort projects by creation date and calculate cumulative XP
   const sortedProjects = [...projects].sort(
     (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
@@ -293,16 +300,24 @@ const createXpByProjectGraph = (projects) => {
   const width = container.clientWidth;
   const height = Math.min(400, Math.max(250, width * 0.4)); // Responsive height with limits
 
-  // Set up responsive SVG
+  // Set up responsive SVG with viewBox for better scaling
   const svg = d3.select('#xp-progress')
-    .attr('width', width)
+    .attr('width', '100%')
     .attr('height', height)
-    .style('overflow', 'visible'); // Allow labels to overflow
+    .attr('viewBox', `0 0 ${width} ${height}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .style('overflow', 'hidden'); // Prevent overflow
   
   svg.selectAll('*').remove();
 
-  // Set up dimensions with adjusted margins
-  const margin = { top: 30, right: 30, bottom: 60, left: 70 };
+  // Set up dimensions with dynamic margins that scale with container size
+  const margin = {
+    top: Math.max(20, height * 0.08),
+    right: Math.max(20, width * 0.05),
+    bottom: Math.max(50, height * 0.15), // Larger bottom margin for rotated labels
+    left: Math.max(50, width * 0.1)
+  };
+
   const innerWidth = width - margin.left - margin.right;
   const innerHeight = height - margin.top - margin.bottom;
 
@@ -326,6 +341,7 @@ const createXpByProjectGraph = (projects) => {
   // Create container group
   const g = svg
     .append('g')
+    .attr('class', 'chart-group')
     .attr('transform', `translate(${margin.left},${margin.top})`);
 
   // Add grid lines with theme color
@@ -335,6 +351,7 @@ const createXpByProjectGraph = (projects) => {
     .data(y.ticks(5))
     .enter()
     .append('line')
+    .attr('class', 'grid-line')
     .attr('x1', 0)
     .attr('x2', innerWidth)
     .attr('y1', d => y(d))
@@ -343,10 +360,11 @@ const createXpByProjectGraph = (projects) => {
     .style('stroke-dasharray', '2,2');
 
   // Create gradient for the line
+  const gradientId = 'lineGradient-' + Date.now(); // Unique ID to prevent conflicts
   const gradient = svg
     .append('defs')
     .append('linearGradient')
-    .attr('id', 'lineGradient')
+    .attr('id', gradientId)
     .attr('x1', '0%')
     .attr('y1', '0%')
     .attr('x2', '100%')
@@ -355,12 +373,12 @@ const createXpByProjectGraph = (projects) => {
   gradient
     .append('stop')
     .attr('offset', '0%')
-    .style('stop-color', '#3b82f6'); // Theme blue
+    .style('stop-color', '#3b82f6');
 
   gradient
     .append('stop')
     .attr('offset', '100%')
-    .style('stop-color', '#c62368'); // Theme pink
+    .style('stop-color', '#c62368');
 
   // Create the step line generator
   const line = d3
@@ -371,14 +389,17 @@ const createXpByProjectGraph = (projects) => {
 
   // Add the step line path with enhanced styling
   g.append('path')
-    .datum(cumulativeData)
     .attr('class', 'line')
+    .datum(cumulativeData)
     .attr('d', line)
     .style('fill', 'none')
-    .style('stroke', 'url(#lineGradient)')
-    .style('stroke-width', 3)
+    .style('stroke', `url(#${gradientId})`)
+    .style('stroke-width', Math.min(3, width * 0.005)) // Responsive stroke width
     .style('stroke-linejoin', 'round')
     .style('filter', 'drop-shadow(0 0 6px rgba(59, 130, 246, 0.3))');
+
+  // Calculate responsive dot size
+  const dotRadius = Math.min(5, Math.max(3, width * 0.008));
 
   // Add dots with improved styling
   const dots = g
@@ -389,16 +410,17 @@ const createXpByProjectGraph = (projects) => {
     .attr('class', 'dot')
     .attr('cx', (d) => x(new Date(d.createdAt)))
     .attr('cy', (d) => y(d.cumulativeXP))
-    .attr('r', 5)
+    .attr('r', dotRadius)
     .style('fill', '#3b82f6')
     .style('stroke', '#fff')
-    .style('stroke-width', 2)
+    .style('stroke-width', Math.min(2, width * 0.003))
     .style('filter', 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))');
 
-  // Enhanced tooltip
+  // Enhanced tooltip with responsive positioning
   const tooltip = d3
     .select('body')
     .append('div')
+    .attr('class', 'chart-tooltip')
     .style('position', 'absolute')
     .style('padding', '12px')
     .style('background', 'rgba(59, 130, 246, 0.1)')
@@ -406,22 +428,39 @@ const createXpByProjectGraph = (projects) => {
     .style('border', '1px solid rgba(59, 130, 246, 0.2)')
     .style('border-radius', '8px')
     .style('color', 'white')
-    .style('font-size', '12px')
+    .style('font-size', `${Math.min(12, Math.max(10, width * 0.02))}px`)
     .style('pointer-events', 'none')
     .style('opacity', 0)
+    .style('z-index', '1000')
     .style('box-shadow', '0 4px 6px rgba(0, 0, 0, 0.1)');
 
   // Enhanced interactions
   dots
     .on('mouseover', (event, d) => {
-      d3.select(event.currentTarget)
+      const dotElement = d3.select(event.currentTarget);
+      dotElement
         .transition()
         .duration(200)
-        .attr('r', 7)
+        .attr('r', dotRadius * 1.5)
         .style('fill', '#c62368')
         .style('filter', 'drop-shadow(0 0 6px rgba(198, 35, 104, 0.5))');
 
       tooltip.transition().duration(200).style('opacity', 1);
+
+      // Calculate tooltip position
+      const tooltipWidth = 200; // Approximate width
+      const tooltipHeight = 120; // Approximate height
+      let tooltipX = event.pageX + 10;
+      let tooltipY = event.pageY - 28;
+
+      // Adjust if tooltip would go off screen
+      if (tooltipX + tooltipWidth > window.innerWidth) {
+        tooltipX = event.pageX - tooltipWidth - 10;
+      }
+      if (tooltipY + tooltipHeight > window.innerHeight) {
+        tooltipY = event.pageY - tooltipHeight - 10;
+      }
+
       tooltip
         .html(
           `
@@ -436,21 +475,23 @@ const createXpByProjectGraph = (projects) => {
           }
         `
         )
-        .style('left', `${event.pageX + 10}px`)
-        .style('top', `${event.pageY - 28}px`);
+        .style('left', `${tooltipX}px`)
+        .style('top', `${tooltipY}px`);
     })
     .on('mouseout', (event) => {
       d3.select(event.currentTarget)
         .transition()
         .duration(200)
-        .attr('r', 5)
+        .attr('r', dotRadius)
         .style('fill', '#3b82f6')
         .style('filter', 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))');
 
       tooltip.transition().duration(500).style('opacity', 0);
     });
 
-  // Add and style axes
+  // Add and style axes with responsive font sizes
+  const fontSize = Math.min(10, Math.max(8, width * 0.02));
+  
   const xAxis = d3.axisBottom(x)
     .ticks(width < 600 ? 4 : 6)
     .tickFormat(d => d.toLocaleDateString());
@@ -461,6 +502,7 @@ const createXpByProjectGraph = (projects) => {
 
   // Add x-axis with enhanced styling
   const xAxisG = g.append('g')
+    .attr('class', 'x-axis')
     .attr('transform', `translate(0,${innerHeight})`)
     .call(xAxis);
 
@@ -470,39 +512,90 @@ const createXpByProjectGraph = (projects) => {
     .attr('dy', '.15em')
     .attr('transform', 'rotate(-45)')
     .style('fill', 'rgba(255, 255, 255, 0.8)')
-    .style('font-size', '10px');
+    .style('font-size', `${fontSize}px`);
 
   // Add y-axis with enhanced styling
   const yAxisG = g.append('g')
+    .attr('class', 'y-axis')
     .call(yAxis);
 
   yAxisG.selectAll('text')
     .style('fill', 'rgba(255, 255, 255, 0.8)')
-    .style('font-size', '10px');
+    .style('font-size', `${fontSize}px`);
 
   // Style axis lines
-  g.selectAll('.domain')
-    .style('stroke', 'rgba(59, 130, 246, 0.2)');
+  g.selectAll('.domain, .tick line')
+    .style('stroke', 'rgba(59, 130, 246, 0.2)')
+    .style('stroke-width', Math.min(1, width * 0.001));
 
-  g.selectAll('.tick line')
-    .style('stroke', 'rgba(59, 130, 246, 0.2)');
-
-  // Add resize handler
-  const resize = () => {
+  // Function to update chart on resize
+  const updateChart = () => {
+    // Get new container dimensions
     const newWidth = container.clientWidth;
     const newHeight = Math.min(400, Math.max(250, newWidth * 0.4));
 
+    // Update SVG dimensions and viewBox
     svg
-      .attr('width', newWidth)
-      .attr('height', newHeight);
+      .attr('height', newHeight)
+      .attr('viewBox', `0 0 ${newWidth} ${newHeight}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
-    // Update scales and rerender
-    x.range([0, newWidth - margin.left - margin.right]);
-    y.range([newHeight - margin.top - margin.bottom, 0]);
+    // Update margins
+    margin.top = Math.max(20, newHeight * 0.08);
+    margin.right = Math.max(20, newWidth * 0.05);
+    margin.bottom = Math.max(50, newHeight * 0.15);
+    margin.left = Math.max(50, newWidth * 0.1);
+
+    const newInnerWidth = newWidth - margin.left - margin.right;
+    const newInnerHeight = newHeight - margin.top - margin.bottom;
+
+    // Update scales
+    x.range([0, newInnerWidth]);
+    y.range([newInnerHeight, 0]);
+
+    // Update all elements
+    g.attr('transform', `translate(${margin.left},${margin.top})`);
+    g.select('.line').attr('d', line);
+    g.selectAll('.dot')
+      .attr('cx', d => x(new Date(d.createdAt)))
+      .attr('cy', d => y(d.cumulativeXP))
+      .attr('r', Math.min(5, Math.max(3, newWidth * 0.008)));
+    
+    g.selectAll('.grid-line')
+      .attr('x2', newInnerWidth)
+      .attr('y1', d => y(d))
+      .attr('y2', d => y(d));
+
+    // Update axes
+    const newFontSize = Math.min(10, Math.max(8, newWidth * 0.02));
+    
+    g.select('.x-axis')
+      .attr('transform', `translate(0,${newInnerHeight})`)
+      .call(xAxis.ticks(newWidth < 600 ? 4 : 6))
+      .selectAll('text')
+      .style('font-size', `${newFontSize}px`);
+
+    g.select('.y-axis')
+      .call(yAxis)
+      .selectAll('text')
+      .style('font-size', `${newFontSize}px`);
+  };
+
+  // Debounced resize handler
+  let resizeTimeout;
+  const debouncedResize = () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(updateChart, 250);
   };
 
   // Add resize listener
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize', debouncedResize);
+
+  // Cleanup function
+  return () => {
+    window.removeEventListener('resize', debouncedResize);
+    clearTimeout(resizeTimeout);
+  };
 };
 
 const renderProjectsMap = (projects) => {
