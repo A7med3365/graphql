@@ -71,16 +71,16 @@ const fetchProfileData = async () => {
         }
       }
       progress: transaction(
-        where: {type: {_eq: "xp"}, eventId: {_eq: $eventId}}
+        where: {type: {_eq: "xp"}, eventId: {_eq: 20}}
         order_by: {createdAt: asc}
       ) {
         amount
+        createdAt
         object {
           name
           type
-          createdAt
+          attrs
         }
-        type
       }
       level: transaction(
         limit: 1
@@ -94,20 +94,6 @@ const fetchProfileData = async () => {
         distinct_on:[type]
       ) {
         type
-      }
-      projects: transaction(
-          where: {
-            type: {_eq: "xp"},
-            object: {type: {_eq: "project"}}
-          },
-          order_by: {createdAt: asc}
-        ) {
-          amount
-          createdAt
-          object {
-            name
-            attrs
-          }
       }
     }
   `;
@@ -263,7 +249,7 @@ const displayProfile = (data) => {
     .join(' ');
 
   // Initialize chart and projects map
-  createXpByProjectGraph(data.projects);
+  createXpByProjectGraph(data.progress);
 
   // Logout handler
   document.getElementById('logout-button').addEventListener('click', () => {
@@ -280,19 +266,16 @@ const createXpByProjectGraph = (projects) => {
   parentElement.style.position = 'relative'; // For proper sizing
   parentElement.style.display = 'block'; // Ensure block display
 
-  // Sort projects by creation date and calculate cumulative XP
-  const sortedProjects = [...projects].sort(
-    (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-  );
-
   let cumulativeXP = 0;
-  const cumulativeData = sortedProjects.map((project) => {
+  const cumulativeData1 = projects.map((project) => {
     cumulativeXP += project.amount;
     return {
       ...project,
       cumulativeXP,
     };
   });
+
+  const cumulativeData = cumulativeData1.filter((d) => d.object.type === 'project');
 
   // Get container dimensions
   const container = document.getElementById('xp-progress').parentElement;
